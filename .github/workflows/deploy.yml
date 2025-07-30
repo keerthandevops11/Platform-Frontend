@@ -55,14 +55,78 @@ jobs:
       - name: Setup Monitoring
         if: ${{ github.event.inputs.enable_monitoring == 'true' }}
         run: |
-          echo "🛠️ Setting up monitoring on ${{ github.event.inputs.vm_type }} VM"
+          echo "🛠️ Setting up Prometheus Node Exporter on ${{ github.event.inputs.vm_type }} VM"
+
+          # Define Node Exporter version
+          NODE_EXPORTER_VERSION="1.5.0"
 
           if [[ "${{ github.event.inputs.vm_type }}" == "ec2" ]]; then
-            # Example: Install CloudWatch agent or Prometheus node exporter on EC2
-            echo "Installing CloudWatch Agent on EC2..."
-            # Insert commands or scripts to setup monitoring here
+            echo "Installing Prometheus Node Exporter on EC2..."
+
+            EC2_IP="${{ secrets.EC2_INSTANCE_IP }}"
+            SSH_KEY="${{ secrets.EC2_SSH_KEY }}"
+
+            ssh -o StrictHostKeyChecking=no -i $SSH_KEY ec2-user@$EC2_IP << EOF
+              sudo useradd --no-create-home --shell /bin/false node_exporter || true
+              wget https://github.com/prometheus/node_exporter/releases/download/v$NODE_EXPORTER_VERSION/node_exporter-$NODE_EXPORTER_VERSION.linux-amd64.tar.gz
+              tar xvfz node_exporter-$NODE_EXPORTER_VERSION.linux-amd64.tar.gz
+              sudo cp node_exporter-$NODE_EXPORTER_VERSION.linux-amd64/node_exporter /usr/local/bin/
+              sudo chown node_exporter:node_exporter /usr/local/bin/node_exporter
+
+              echo '[Unit]
+              Description=Prometheus Node Exporter
+              Wants=network-online.target
+              After=network-online.target
+
+              [Service]
+              User=node_exporter
+              Group=node_exporter
+              Type=simple
+              ExecStart=/usr/local/bin/node_exporter
+
+              [Install]
+              WantedBy=default.target' | sudo tee /etc/systemd/system/node_exporter.service
+
+              sudo systemctl daemon-reload
+              sudo systemctl enable node_exporter
+              sudo systemctl start node_exporter
+              sudo systemctl status node_exporter
+EOF
+
           elif [[ "${{ github.event.inputs.vm_type }}" == "azure_vm" ]]; then
-            # Example: Install Azure Monitor agent on Azure VM
-            echo "Installing Azure Monitor Agent..."
-            # Insert commands or scripts to setup monitoring here
+            echo "Installing Prometheus Node Exporter on Azure VM..."
+
+            AZURE_VM_IP="${{ secrets.AZURE_VM_IP }}"
+            SSH_KEY="${{ secrets.AZURE_SSH_KEY }}"
+
+            ssh -o StrictHostKeyChecking=no -i $SSH_KEY azureuser@$AZURE_VM_IP << EOF
+              sudo useradd --no-create-home --shell /bin/false node_exporter || true
+              wget https://github.com/prometheus/node_exporter/releases/download/v$NODE_EXPORTER_VERSION/node_exporter-$NODE_EXPORTER_VERSION.linux-amd64.tar.gz
+              tar xvfz node_exporter-$NODE_EXPORTER_VERSION.linux-amd64.tar.gz
+              sudo cp node_exporter-$NODE_EXPORTER_VERSION.linux-amd64/node_exporter /usr/local/bin/
+              sudo chown node_exporter:node_exporter /usr/local/bin/node_exporter
+
+              echo '[Unit]
+              Description=Prometheus Node Exporter
+              Wants=network-online.target
+              After=network-online.target
+
+              [Service]
+              User=node_exporter
+              Group=node_exporter
+              Type=simple
+              ExecStart=/usr/local/bin/node_exporter
+
+              [Install]
+              WantedBy=multi-user.target' | sudo tee /etc/systemd/system/node_exporter.service
+
+              sudo systemctl daemon-reload
+              sudo systemctl enable node_exporter
+              sudo systemctl start node_exporter
+              sudo systemctl status node_exporter
+EOF
+
+          else
+            echo "Unsupported VM type for monitoring setup"
+            exit 1
           fi
