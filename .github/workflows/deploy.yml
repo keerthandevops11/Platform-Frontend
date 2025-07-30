@@ -11,6 +11,11 @@ on:
         options:
           - ec2
           - azure_vm
+      enable_monitoring:
+        description: 'Enable monitoring setup'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
   deploy:
@@ -46,3 +51,18 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Setup Monitoring
+        if: ${{ github.event.inputs.enable_monitoring == 'true' }}
+        run: |
+          echo "🛠️ Setting up monitoring on ${{ github.event.inputs.vm_type }} VM"
+
+          if [[ "${{ github.event.inputs.vm_type }}" == "ec2" ]]; then
+            # Example: Install CloudWatch agent or Prometheus node exporter on EC2
+            echo "Installing CloudWatch Agent on EC2..."
+            # Insert commands or scripts to setup monitoring here
+          elif [[ "${{ github.event.inputs.vm_type }}" == "azure_vm" ]]; then
+            # Example: Install Azure Monitor agent on Azure VM
+            echo "Installing Azure Monitor Agent..."
+            # Insert commands or scripts to setup monitoring here
+          fi
